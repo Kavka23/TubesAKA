@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Komentar Bersarang Iteratif vs Rekursif</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #000;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 420px;
+      margin: auto;
+      padding: 15px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+
+    .input-box textarea {
+      width: 100%;
+      height: 50px;
+      border-radius: 8px;
+      border: none;
+      padding: 8px;
+      resize: none;
+    }
+
+    button {
+      margin-top: 6px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 20px;
+      background: #ff0050;
+      color: white;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    button.secondary {
+      background: #444;
+    }
+
+    .comment {
+      margin-top: 12px;
+      padding: 8px;
+      background: #111;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .reply {
+      margin-left: 18px;
+      border-left: 2px solid #333;
+      padding-left: 10px;
+    }
+
+    .comment-actions {
+      margin-top: 4px;
+    }
+
+    .comment-actions button {
+      background: transparent;
+      color: #aaa;
+      font-size: 11px;
+      padding: 0;
+      margin-right: 10px;
+    }
+
+    .reply-box textarea {
+      height: 35px;
+      margin-top: 5px;
+    }
+
+    .mode {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Komentar Bersarang (Iteratif vs Rekursif)</h1>
+
+  <div class="mode">
+    <button class="secondary" onclick="setMode('recursive')">Mode Rekursif</button>
+    <button class="secondary" onclick="setMode('iterative')">Mode Iteratif</button>
+    <p id="modeText">Mode aktif: Rekursif</p>
+    <br>
+    <button onclick="runExperiment()">Jalankan Eksperimen (n = 1–10000)</button>
+  </div>
+
+  <div class="input-box">
+    <textarea id="mainInput" placeholder="Tambahkan komentar..."></textarea>
+    <button onclick="addMainComment()">Post</button>
+  </div>
+
+  <div id="commentList"></div>
+</div>
+
+<script>
+  // ==========================
+  // DATA KOMENTAR (TREE)
+  // ==========================
+  let comments = [];
+  let mode = 'recursive';
+
+  function setMode(m) {
+    mode = m;
+    document.getElementById('modeText').innerText = 'Mode aktif: ' + (m === 'recursive' ? 'Rekursif' : 'Iteratif');
+    render();
+  }
+
+  function addMainComment() {
+    const text = mainInput.value.trim();
+    if (!text) return;
+
+    comments.push({ text, replies: [] });
+    mainInput.value = '';
+    render();
+  }
+
+  // ==========================
+  // RENDER SWITCH
+  // ==========================
+  function render() {
+  const container = document.getElementById('commentList');
+  container.innerHTML = '';
+
+  const start = performance.now(); // START TIME
+
+  if (mode === 'recursive') {
+    renderRecursive(comments, container);
+  } else {
+    renderIterative(container);
+  }
+
+  const end = performance.now(); // END TIME
+
+  const n = countComments(comments);
+  const time = (end - start).toFixed(4);
+
+  document.getElementById('modeText').innerText =
+    `Mode aktif: ${mode === 'recursive' ? 'Rekursif' : 'Iteratif'} | n = ${n} | Time = ${time} ms`;
+
+  console.log(
+    `Mode: ${mode.toUpperCase()} | n = ${n} | Time = ${time} ms`
+  );
+}
+
+
+  // ==========================
+  // REKURSIF (Natural Tree)
+  // ==========================
+  function renderRecursive(list, parent) {
+    list.forEach(comment => {
+      const el = createCommentElement(comment);
+      parent.appendChild(el);
+
+      if (comment.replies.length > 0) {
+        const replyContainer = document.createElement('div');
+        replyContainer.className = 'reply';
+        el.appendChild(replyContainer);
+        renderRecursive(comment.replies, replyContainer);
+      }
+    });
+  }
+
+  // ==========================
+  // ITERATIF (STACK DFS)
+  // ==========================
+  function renderIterative(container) {
+    let stack = [];
+
+    comments.forEach(c => stack.push({ comment: c, parent: container, level: 0 }));
+
+    while (stack.length > 0) {
+      const { comment, parent, level } = stack.pop();
+      const el = createCommentElement(comment);
+
+      if (level > 0) el.classList.add('reply');
+      parent.appendChild(el);
+
+      for (let i = comment.replies.length - 1; i >= 0; i--) {
+        stack.push({ comment: comment.replies[i], parent: el, level: level + 1 });
+      }
+    }
+  }
+
+  // ==========================
+  // UI KOMENTAR
+  // ==========================
+  function createCommentElement(comment) {
+    const div = document.createElement('div');
+    div.className = 'comment';
+
+    const p = document.createElement('p');
+    p.textContent = comment.text;
+
+    const actions = document.createElement('div');
+    actions.className = 'comment-actions';
+
+    const replyBtn = document.createElement('button');
+    replyBtn.textContent = 'Reply';
+    replyBtn.onclick = () => showReplyBox(div, comment);
+
+    actions.appendChild(replyBtn);
+
+    div.appendChild(p);
+    div.appendChild(actions);
+    return div;
+  }
+
+  function showReplyBox(parent, comment) {
+    if (parent.querySelector('.reply-box')) return;
+
+    const box = document.createElement('div');
+    box.className = 'reply-box';
+
+    const ta = document.createElement('textarea');
+    ta.placeholder = 'Balas komentar...';
+
+    const btn = document.createElement('button');
+    btn.textContent = 'Kirim';
+    btn.onclick = () => {
+      if (!ta.value.trim()) return;
+      comment.replies.push({ text: ta.value, replies: [] });
+      render();
+    };
+
+    box.appendChild(ta);
+    box.appendChild(btn);
+    parent.appendChild(box);
+  }
+  // ==========================
+  // HITUNG JUMLAH KOMENTAR (n)
+  // ==========================
+  function countComments(list) {
+    let count = 0;
+    list.forEach(c => {
+      count++;
+      count += countComments(c.replies);
+    });
+    return count;
+  }
+  // ==========================
+  // GENERATE KOMENTAR OTOMATIS
+  // ==========================
+  function generateComments(n) {
+    comments = [];
+    for (let i = 0; i < n; i++) {
+      comments.push({ text: `Komentar ${i + 1}`, replies: [] });
+    }
+  }
+
+  // ==========================
+  // EKSPERIMEN RUNNING TIME
+  // ==========================
+  function runExperiment() {
+    const sizes = [1, 10, 100, 1000, 10000];
+    console.clear();
+    console.log('=== HASIL EKSPERIMEN RUNNING TIME ===');
+
+    sizes.forEach(n => {
+      generateComments(n);
+
+      // REKURSIF
+      mode = 'recursive';
+      let start = performance.now();
+      renderRecursive(comments, document.createElement('div'));
+      let end = performance.now();
+      let timeRecursive = (end - start).toFixed(4);
+
+      // ITERATIF
+      mode = 'iterative';
+      start = performance.now();
+      renderIterative(document.createElement('div'));
+      end = performance.now();
+      let timeIterative = (end - start).toFixed(4);
+
+      console.log(`n = ${n} | Rekursif = ${timeRecursive} ms | Iteratif = ${timeIterative} ms`);
+    });
+
+    alert('Eksperimen selesai!\nLihat hasil di Console (F12).');
+  }
+</script>
+
+</body>
+</html>
